@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ta">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TGT Main2 Pro</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #0d1117; color: #c9d1d9; text-align: center; padding: 10px; margin: 0; }
+        .box { background: #161b22; border-radius: 12px; padding: 15px; margin: 10px auto; max-width: 500px; border: 1px solid #30363d; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+        .card { padding: 10px; border-radius: 6px; font-weight: bold; font-size: 0.85rem; border: 1px solid rgba(255,255,255,0.05); }
+        .BUY-tag { background: #238636; color: white; }
+        .SELL-tag { background: #da3633; color: white; }
+        .WAIT-tag { background: #30363d; color: #8b949e; }
+        .btn { background: #58a6ff; color: black; border: none; padding: 12px; width: 100%; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 1rem; }
+        .count { float: right; background: rgba(0,0,0,0.2); padding: 0 8px; border-radius: 10px; }
+        h3 { margin: 5px 0; text-align: left; font-size: 1.1rem; }
+    </style>
+</head>
+<body>
+
+    <h2 style="color: #58a6ff; margin-top: 20px;">TGT Main2 LIVE</h2>
+    
+    <div class="box">
+        <button class="btn" id="sndBtn" onclick="initAudio()">🔔 சவுண்ட் அலர்ட் ஆக்டிவேட் செய்</button>
+    </div>
+
+    <div id="displayArea">தரவுகள் புதுப்பிக்கப்படுகின்றன...</div>
+
+    <script>
+        const url = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSDDw_0R5I72Kp1RSTOTaJEGmAEUBInSF_bSneyvtb1sc-UED_3y7jbBAIC22rp2sUWSLowZ9C5Ri2l/pub?gid=1778670401&single=true&output=csv';
+        
+        let audioOn = false;
+        let lastSignals = {};
+        const beep = new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg');
+
+        function initAudio() {
+            audioOn = true;
+            document.getElementById('sndBtn').innerText = "🔊 சவுண்ட் அலர்ட் ஆன் செய்யப்பட்டுள்ளது";
+            document.getElementById('sndBtn').style.background = "#238636";
+            document.getElementById('sndBtn').style.color = "white";
+        }
+
+        async function updateDashboard() {
+            try {
+                const response = await fetch(url + '&t=' + Date.now());
+                const csvText = await response.text();
+                const lines = csvText.split('\n');
+                
+                let buyH = '', sellH = '', waitH = '';
+                let bc = 0, sc = 0, wc = 0;
+
+                for (let i = 1; i < lines.length; i++) {
+                    const col = lines[i].split(',');
+                    if (col.length < 5) continue;
+
+                    let stock = col[3] ? col[3].replace(/"/g, '').trim() : '';
+                    let signal = col[4] ? col[4].replace(/"/g, '').trim().toUpperCase() : '';
+
+                    // காலியான பெயர்களைத் தவிர்க்கவும் (இங்குதான் உங்கள் தவறு சரி செய்யப்படுகிறது)
+                    if (!stock || stock === "" || stock === "STOCK") continue;
+
+                    let tag = `<div class="card ${signal}-tag">${stock}</div>`;
+
+                    if (signal === 'BUY') { buyH += tag; bc++; }
+                    else if (signal === 'SELL') { sellH += tag; sc++; }
+                    else { waitH += tag; wc++; }
+
+                    // சிக்னல் மாறினால் சத்தம் (WAIT-லிருந்து மாறினால் மட்டும்)
+                    if (audioOn && lastSignals[stock] && lastSignals[stock] !== signal) {
+                        if (signal === 'BUY' || signal === 'SELL') beep.play();
+                    }
+                    lastSignals[stock] = signal;
+                }
+
+                document.getElementById('displayArea').innerHTML = `
+                    <div class="box"><h3 style="color:#39d353">BUY <span class="count">${bc}</span></h3><div class="grid">${buyH || 'இல்லை'}</div></div>
+                    <div class="box"><h3 style="color:#f85149">SELL <span class="count">${sc}</span></h3><div class="grid">${sellH || 'இல்லை'}</div></div>
+                    <div class="box"><h3 style="color:#8b949e">WAIT <span class="count">${wc}</span></h3><div class="grid">${waitH || 'இல்லை'}</div></div>
+                `;
+            } catch (e) {
+                document.getElementById('displayArea').innerHTML = "இணைப்பதில் சிக்கல்... மீண்டும் முயற்சிக்கவும்.";
+            }
+        }
+
+        setInterval(updateDashboard, 10000); // 10 விநாடிக்கு ஒருமுறை
+        updateDashboard();
+    </script>
+</body>
+</html>
